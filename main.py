@@ -32,7 +32,6 @@ def callback():
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
     user_msg = event.message.text.strip()
-    user_msg = user_msg.replace("臺", "台")
     user_id = event.source.user_id
 
     # 🛑 核心防禦一：合約關鍵字攔截
@@ -45,25 +44,32 @@ def handle_message(event):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
         return
 
-    # 🔍 核心防禦二：地址偵測與入庫
-    if any(k in user_msg for k in ["路", "街", "巷", "號", "樓"]):
+    # 核心防禦二：地址偵測與入庫
+    # 1. 先把文字前後空格修掉
+    clean_msg = user_msg.strip()
+    
+    # 2. 自動將所有繁體「臺」字標準化替換為「台」
+    clean_msg = clean_msg.replace("臺", "台")
+    
+    # 3. 判斷是否包含常見的地址關鍵字
+    if any(k in clean_msg for k in ["路", "街", "巷", "號", "樓"]):
         try:
             data = {
                 "line_uid": user_id,
                 "signed_agreement": False,
-                "region_tag": user_msg
+                "region_tag": clean_msg  # 存入標準化後的「台」字地址
             }
+            
             # 執行寫入 Supabase
             supabase.table("user_contracts").insert(data).execute()
             
             reply_text = (
-                "✅ 數據已成功去識別化匿名入庫！\n"
-                "後台同步將其碎紙化為亂碼儲存中...\n"
-                "（安全防禦機制啟動：本紀錄將於 30 天後全自動老化銷毀）"
+                "✅ 數據已成功去識別化匿名入庫！\n\n"
+                "系統已成功為您攔截並將此筆地址記錄至雲端去識別化資料庫。"
             )
         except Exception as e:
             reply_text = f"❌ 數據對接異常: {str(e)}"
-        
+            
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
         return
 
