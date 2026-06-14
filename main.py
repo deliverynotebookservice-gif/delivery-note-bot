@@ -10,8 +10,10 @@ app = Flask(__name__)
 # 讀取環境變數
 LINE_CHANNEL_ACCESS_TOKEN = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN")
 LINE_CHANNEL_SECRET = os.environ.get("LINE_CHANNEL_SECRET")
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+SUPABASE_URL = "https://munsqncqqzkcafezgozo.supabase.co"
+SUPABASE_KEY = "sb_publishable_lnm0BVm9gBxxeYJ8z15nFA_slnl4mwX"
+
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
