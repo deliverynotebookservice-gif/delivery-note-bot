@@ -8,7 +8,7 @@ from supabase import create_client, Client
 
 app = Flask(__name__)
 
-# 讀取 Render 後台設定的環境變數
+# 讀取環境變數
 LINE_CHANNEL_ACCESS_TOKEN = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN")
 LINE_CHANNEL_SECRET = os.environ.get("LINE_CHANNEL_SECRET")
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
@@ -33,7 +33,7 @@ def handle_message(event):
     user_msg = event.message.text.strip()
     user_id = event.source.user_id
 
-    # 🛑 核心防禦一：合約關鍵字攔截機制
+    # 🛑 核心防禦一：合約攔截機制
     if "合約" in user_msg or "簽" in user_msg:
         reply_text = (
             "⚠️【法律免責聲明與回報須知】\n"
@@ -43,21 +43,15 @@ def handle_message(event):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
         return
 
-    # 🔍 核心防禦二：地址洗滌與去識別化入庫機制
-    # 只要字串中包含路、街、巷、號，或是直接輸入「進入筆記回報」等關鍵字後的地址
+    # 🔍 核心防禦二：地址偵測與入庫
     if any(k in user_msg for k in ["路", "街", "巷", "號", "樓"]):
         try:
-            # 將明文地址在寫入資料庫前直接進行洗滌與去識別化
-            cleaned_address = user_msg
-            
-            # 寫入 Supabase 保險箱
+            # 寫入 Supabase user_contracts 表格
             data = {
-                "user_id": user_id,
-                "address_log": cleaned_address,
-                "is_contract_agreed": False,
-                "contract_log": "拒絕簽署/無權限涉入"
+                "line_uid": user_id,
+                "signed_agreement": False,
+                "region_tag": user_msg  # 先把回報內容暫存於此，方便盲測看效果
             }
-            # 執行寫入
             supabase.table("user_contracts").insert(data).execute()
             
             reply_text = (
@@ -66,7 +60,7 @@ def handle_message(event):
                 "（安全防禦機制啟動：本紀錄將於 30 天後全自動老化銷毀）"
             )
         except Exception as e:
-            reply_text = f"❌ 系統數據對接異常，請通知管理員檢查。\n錯誤代碼: {str(e)}"
+            reply_text = f"❌ 數據對接異常: {str(e)}"
         
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
         return
