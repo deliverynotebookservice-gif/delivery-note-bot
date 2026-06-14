@@ -42,14 +42,14 @@ def handle_message(event):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
         return
 
-    # 🔍 核心防禦二：地址偵測與入庫（精準對齊資料庫欄位）
+    # 🔍 核心防禦二：地址偵測與入庫（這次百分之百對齊欄位了！）
     if any(k in user_msg for k in ["路", "街", "巷", "號", "樓"]):
         try:
-            # 填入完全符合資料庫定義的格式
+            # 填入完全符合你 Supabase 結構的欄位名稱
             data = {
                 "line_uid": user_id,
-                "signed_agreement": False,       # 嚴格維持 Boolean (True/False)
-                "region_tag": user_msg            # 把回報地址完整塞進這個文字格子
+                "signed_agreement": False,
+                "contract_log": user_msg  # 精準對齊 contract_log 欄位！
             }
             # 執行寫入
             supabase.table("user_contracts").insert(data).execute()
