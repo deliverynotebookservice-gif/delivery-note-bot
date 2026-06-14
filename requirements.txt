@@ -1,6 +1,4 @@
 Flask==3.0.3
 line-bot-sdk==3.5.0
 gunicorn==22.0.0
-pydantic==2.7.4
-pydantic_core==2.18.4
 supabase==2.4.0
