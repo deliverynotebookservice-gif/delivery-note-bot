@@ -10,7 +10,7 @@ app = Flask(__name__)
 # 讀取環境變數
 LINE_CHANNEL_ACCESS_TOKEN = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN")
 LINE_CHANNEL_SECRET = os.environ.get("LINE_CHANNEL_SECRET")
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_URL = "https://munsqncqqzkcafezgozo.supabase.co"
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
 # 建立 Supabase 連線（只保留一個，確保乾淨）
