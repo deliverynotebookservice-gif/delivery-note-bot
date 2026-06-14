@@ -13,11 +13,11 @@ LINE_CHANNEL_SECRET = os.environ.get("LINE_CHANNEL_SECRET")
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
+# 建立 Supabase 連線（只保留一個，確保乾淨）
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 @app.route("/callback", methods=['POST'])
 def callback():
@@ -44,16 +44,15 @@ def handle_message(event):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
         return
 
-    # 🔍 核心防禦二：地址偵測與入庫（這次百分之百對齊欄位了！）
+    # 🔍 核心防禦二：地址偵測與入庫
     if any(k in user_msg for k in ["路", "街", "巷", "號", "樓"]):
         try:
-            # 填入完全符合你 Supabase 結構的欄位名稱
             data = {
                 "line_uid": user_id,
                 "signed_agreement": False,
-                "region_tag": user_msg  # 精準對齊 region_tag 欄位！
+                "region_tag": user_msg
             }
-            # 執行寫入
+            # 執行寫入 Supabase
             supabase.table("user_contracts").insert(data).execute()
             
             reply_text = (
@@ -76,4 +75,6 @@ def handle_message(event):
     line_bot_api.reply_message(event.reply_token, TextSendMessage(text=default_reply))
 
 if __name__ == "__main__":
-    app.run(port=10000)
+    # 完美適應 Render 雲端環境的 Port 綁定
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
