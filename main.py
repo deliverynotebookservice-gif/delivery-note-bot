@@ -13,7 +13,7 @@ LINE_CHANNEL_SECRET = os.environ.get("LINE_CHANNEL_SECRET")
 SUPABASE_URL = "https://munsqncqqzkcafezgozo.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11bnNxbmNxcXprY2FmZXpnb3pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0MDUxOTQsImV4cCI6MjA5Njk4MTE5NH0.eLxLhAUljYsvMhfojJnYf4USgCs31W7UkI-hNJHCgdo"
 
-# 建立 Supabase 連線（只保留一個，確保乾淨）
+# 建立 Supabase 連線
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
@@ -75,6 +75,5 @@ def handle_message(event):
     line_bot_api.reply_message(event.reply_token, TextSendMessage(text=default_reply))
 
 if __name__ == "__main__":
-    # 完美適應 Render 雲端環境的 Port 綁定
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
