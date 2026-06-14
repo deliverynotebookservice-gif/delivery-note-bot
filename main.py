@@ -11,7 +11,7 @@ app = Flask(__name__)
 LINE_CHANNEL_ACCESS_TOKEN = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN")
 LINE_CHANNEL_SECRET = os.environ.get("LINE_CHANNEL_SECRET")
 SUPABASE_URL = "https://munsqncqqzkcafezgozo.supabase.co"
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11bnNxbmNxcXprY2FmZXpnb3pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0MDUxOTQsImV4cCI6MjA5Njk4MTE5NH0.eLxLhAUljYsvMhfojJnYf4USgCs31W7UkI-hNJHCgdo"
 
 # 建立 Supabase 連線（只保留一個，確保乾淨）
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
