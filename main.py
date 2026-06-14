@@ -11,7 +11,8 @@ app = Flask(__name__)
 LINE_CHANNEL_ACCESS_TOKEN = os.environ.get("LINE_CHANNEL_ACCESS_TOKEN")
 LINE_CHANNEL_SECRET = os.environ.get("LINE_CHANNEL_SECRET")
 SUPABASE_URL = "https://munsqncqqzkcafezgozo.supabase.co"
-SUPABASE_KEY = "sb_publishable_lnm0BVm9gBxxeYJ8z15nFA_slnl4mwX"
+# 請把下面雙引號裡面，替換成你畫面上第 12 行看到的那串 eyJhbGciOi... 開頭的完整長字串
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11bnNxbmNxcXp rY2FmZXpnb3pvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE0MjU2MzMsImV4cCI6MjA5NzAwMTYzM30.bS85mS9K9C3w_EOfu-CgI7Z-X3vVbA5B_U5g_U5g_U5g"
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
