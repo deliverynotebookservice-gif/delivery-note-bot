@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from flask import Flask, request, abort
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
-from linebot.models import MessageEvent, TextMessage, TextSendMessage, FlexMessage
+from linebot.models import MessageEvent, TextMessage, TextSendMessage
 from supabase import create_client, Client
 
 app = Flask(__name__)
