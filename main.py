@@ -49,7 +49,7 @@ def handle_message(event):
             data = {
                 "line_uid": user_id,
                 "signed_agreement": False,
-                "contract_log": user_msg  # 精準對齊 contract_log 欄位！
+                "region_tag": user_msg  # 精準對齊 region_tag 欄位！
             }
             # 執行寫入
             supabase.table("user_contracts").insert(data).execute()
