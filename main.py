@@ -45,7 +45,7 @@ def handle_message(event):
         return
 
     # 核心防禦二：地址偵測與入庫
-    # 1. 先把文字前後空格修掉
+   # 1. 先把文字前後可能不小心打到的空格修掉
     clean_msg = user_msg.strip()
     
     # 2. 自動將所有繁體「臺」字標準化替換為「台」
