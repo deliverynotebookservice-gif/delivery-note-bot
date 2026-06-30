@@ -48,14 +48,14 @@ def handle_message(event):
     user_msg = event.message.text.strip()
     user_id = event.source.user_id
     
-    # 取得今天的日期字串（格式：2026-06-30）
+    # 取得今天的日期字串
     today_str = datetime.now().strftime("%Y-%m-%d")
     
     # 初始化該用戶的每日計數器
     if user_id not in USER_RATE_LIMITS or USER_RATE_LIMITS[user_id]["date"] != today_str:
         USER_RATE_LIMITS[user_id] = {"date": today_str, "address_count": 0, "fortune_count": 0}
 
-    # 🛑 規則一：合約關鍵字攔截（最優先防護）
+    # 🛑 規則一：合約關鍵字攔截
     if "合約" in user_msg or "簽" in user_msg:
         reply_text = (
             "⚠️【法律免責聲明與回報須知】\n"
@@ -65,7 +65,7 @@ def handle_message(event):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
         return
 
-    # 🔮 規則二：運勢抽籤（只要字串包含「運勢」就觸發，每日限 5 次）
+    # 🔮 規則二：按鈕功能中樞——運勢抽籤（只要包含「運勢」就過）
     if "運勢" in user_msg:
         if USER_RATE_LIMITS[user_id]["fortune_count"] >= 5:
             reply_text = "🔮 今日抽籤次數已達上限（5/5）。\n\n貪心會不靈驗喔！祝您今日外送平安，明天再來碰碰運氣吧！"
@@ -78,15 +78,15 @@ def handle_message(event):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
         return
 
-    # 📋 規則三：進入筆記查詢（只要字串包含「查詢」就觸發）
-    if "查詢" in user_msg:
+    # 📋 規則三：按鈕功能中樞——歷史筆記查詢（只要點選單上的「回報」或「查詢」都算）
+    if "回報" in user_msg or "查詢" in user_msg:
         try:
-            # 只篩選出屬於該用戶的歷史地址資料
+            # 去資料庫撈出這個外送員的所有歷史紀錄
             response = supabase.table("user_contracts").select("region_tag, created_at").eq("line_uid", user_id).order("created_at", desc=True).execute()
             records = response.data
             
             if not records:
-                reply_text = "📋 您目前尚未有任何環境回報紀錄。"
+                reply_text = "📋 您目前尚未有任何環境回報紀錄。\n\n💡 提示：請直接在對話框輸入大樓地址（例如：台中市公益路二段100號）即可自動入庫！"
             else:
                 reply_text = "📋 您目前已回報的歷史筆記：\n"
                 for idx, row in enumerate(records, 1):
@@ -99,10 +99,9 @@ def handle_message(event):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
         return
 
-    # 🏢 規則四：地址偵測、標準化與入庫（每日限 60 次）
+    # 🏢 規則四：地址偵測、標準化與入庫（一般打字時才會進來）
     clean_msg = user_msg.replace("臺", "台")
     if any(k in clean_msg for k in ["路", "街", "巷", "號", "樓"]):
-        # 檢查地址計數器是否摸到 60 次天花板
         if USER_RATE_LIMITS[user_id]["address_count"] >= 60:
             reply_text = "⚠️ 今日回報與查詢額度已達上限（60/60）。\n\n為維護系統傳輸效率與匿名數據安全，請於明日再次使用，感謝您的配合！"
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
@@ -114,11 +113,7 @@ def handle_message(event):
                 "signed_agreement": False,
                 "region_tag": clean_msg
             }
-            
-            # 執行寫入 Supabase
             supabase.table("user_contracts").insert(data).execute()
-            
-            # 成功寫入，計數器增加
             USER_RATE_LIMITS[user_id]["address_count"] += 1
             
             reply_text = (
