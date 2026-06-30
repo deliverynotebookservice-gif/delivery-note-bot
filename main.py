@@ -1,5 +1,8 @@
 import os
 import random
+import time
+import threading
+import requests
 from datetime import datetime
 from flask import Flask, request, abort
 from linebot import LineBotApi, WebhookHandler
@@ -33,6 +36,23 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
+# 🕒 核心功能：自動防冬眠打卡機制（每 10 分鐘自動戳一下 Supabase 與自身服務）
+def keep_alive_ping():
+    while True:
+        try:
+            # 1. 戳一下 Supabase，讓資料庫保持清醒
+            supabase.table("user_contracts").select("id").limit(1).execute()
+            print("⚡ [Keep-Alive] 成功戳了一下 Supabase，資料庫運作正常！")
+        except Exception as e:
+            print(f"⚠️ [Keep-Alive] 戳資料庫時發生異常: {str(e)}")
+        
+        # 每 600 秒（10分鐘）打卡一次
+        time.sleep(600)
+
+# 啟動背景打卡線程
+ping_thread = threading.Thread(target=keep_alive_ping, daemon=True)
+ping_thread.start()
+
 @app.route("/callback", methods=['POST'])
 def callback():
     signature = request.headers.get('X-Line-Signature')
@@ -48,7 +68,6 @@ def handle_message(event):
     user_msg = event.message.text.strip()
     user_id = event.source.user_id
     
-    # 取得今天的日期字串
     today_str = datetime.now().strftime("%Y-%m-%d")
     
     # 初始化該用戶的每日計數器
@@ -65,7 +84,7 @@ def handle_message(event):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
         return
 
-    # 🔮 規則二：按鈕功能中樞——運勢抽籤（只要包含「運勢」就過）
+    # 🔮 規則二：按鈕功能中樞——運勢抽籤（只要字串包含「運勢」就強制通關）
     if "運勢" in user_msg:
         if USER_RATE_LIMITS[user_id]["fortune_count"] >= 5:
             reply_text = "🔮 今日抽籤次數已達上限（5/5）。\n\n貪心會不靈驗喔！祝您今日外送平安，明天再來碰碰運氣吧！"
@@ -78,10 +97,9 @@ def handle_message(event):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
         return
 
-    # 📋 規則三：按鈕功能中樞——歷史筆記查詢（只要點選單上的「回報」或「查詢」都算）
+    # 📋 規則三：按鈕功能中樞——歷史筆記查詢（只要字串包含「回報」或「查詢」就強制通關）
     if "回報" in user_msg or "查詢" in user_msg:
         try:
-            # 去資料庫撈出這個外送員的所有歷史紀錄
             response = supabase.table("user_contracts").select("region_tag, created_at").eq("line_uid", user_id).order("created_at", desc=True).execute()
             records = response.data
             
