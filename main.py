@@ -55,7 +55,7 @@ def handle_message(event):
     if user_id not in USER_RATE_LIMITS or USER_RATE_LIMITS[user_id]["date"] != today_str:
         USER_RATE_LIMITS[user_id] = {"date": today_str, "address_count": 0, "fortune_count": 0}
 
-    # 🛑 功能一：合約關鍵字攔截
+    # 🛑 規則一：合約關鍵字攔截（最優先防護）
     if "合約" in user_msg or "簽" in user_msg:
         reply_text = (
             "⚠️【法律免責聲明與回報須知】\n"
@@ -65,8 +65,8 @@ def handle_message(event):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
         return
 
-    # 🔮 功能二：運勢抽籤（每日限 5 次）
-    if "運勢抽籤" in user_msg or "今日運勢" in user_msg:
+    # 🔮 規則二：運勢抽籤（只要字串包含「運勢」就觸發，每日限 5 次）
+    if "運勢" in user_msg:
         if USER_RATE_LIMITS[user_id]["fortune_count"] >= 5:
             reply_text = "🔮 今日抽籤次數已達上限（5/5）。\n\n貪心會不靈驗喔！祝您今日外送平安，明天再來碰碰運氣吧！"
         else:
@@ -78,8 +78,8 @@ def handle_message(event):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
         return
 
-    # 📋 功能三：進入筆記查詢（個人一鍵列表還活著的資料）
-    if "進入筆記查詢" in user_msg or "筆記查詢" in user_msg:
+    # 📋 規則三：進入筆記查詢（只要字串包含「查詢」就觸發）
+    if "查詢" in user_msg:
         try:
             # 只篩選出屬於該用戶的歷史地址資料
             response = supabase.table("user_contracts").select("region_tag, created_at").eq("line_uid", user_id).order("created_at", desc=True).execute()
@@ -90,7 +90,6 @@ def handle_message(event):
             else:
                 reply_text = "📋 您目前已回報的歷史筆記：\n"
                 for idx, row in enumerate(records, 1):
-                    # 格式化輸出，只取地址精華
                     addr = row.get("region_tag", "未知地址")
                     reply_text += f"\n{idx}. 📍 {addr}"
                 reply_text += "\n\n💡 提示：所有回報紀錄將於 60 天後全自動老化銷毀，個人目前僅提供查看，如需刪除請聯繫包廂長。"
@@ -100,7 +99,7 @@ def handle_message(event):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
         return
 
-    # 🏢 功能四：地址偵測、標準化與入庫（每日限 60 次）
+    # 🏢 規則四：地址偵測、標準化與入庫（每日限 60 次）
     clean_msg = user_msg.replace("臺", "台")
     if any(k in clean_msg for k in ["路", "街", "巷", "號", "樓"]):
         # 檢查地址計數器是否摸到 60 次天花板
@@ -132,7 +131,7 @@ def handle_message(event):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
         return
 
-    # 🤖 功能五：萬用防呆回覆
+    # 🤖 規則五：萬用防呆回覆
     default_reply = (
         "💡 歡迎使用外送筆記本自動化安全防護系統。\n\n"
         "請直接輸入『完整大樓地址』開始客觀環境回報：\n"
