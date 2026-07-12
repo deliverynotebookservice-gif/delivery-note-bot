@@ -53,6 +53,10 @@ def keep_alive_ping():
 ping_thread = threading.Thread(target=keep_alive_ping, daemon=True)
 ping_thread.start()
 
+@app.route("/", methods=['GET'])
+def health_check():
+    return "Bot is alive!", 200
+
 @app.route("/callback", methods=['POST'])
 def callback():
     signature = request.headers.get('X-Line-Signature')
