@@ -255,6 +255,7 @@ def handle_message(event):
         not is_join_with_prefix
         and 4 <= len(stripped_msg) <= 8
         and stripped_msg.isalnum()
+        and stripped_msg.isascii()
     )
 
     if is_join_with_prefix or is_bare_password_guess:
