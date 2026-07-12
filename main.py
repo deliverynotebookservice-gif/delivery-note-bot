@@ -99,14 +99,113 @@ def handle_message(event):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
         return
 
-    # 👥 規則：結拜包廂管理入口——顯示快速回覆按鈕
+    # 👥 規則：結拜包廂管理入口——依身分動態顯示
     if user_msg == "查看結拜包廂":
-        quick_reply = QuickReply(items=[
-            QuickReplyButton(action=MessageAction(label="🏠 建立包廂", text="建立包廂")),
-            QuickReplyButton(action=MessageAction(label="🔑 我要加入包廂", text="我要加入包廂"))
-        ])
-        reply_text = "👥 結拜包廂管理\n\n請選擇要建立新包廂，還是輸入密碼加入車友的包廂："
-        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text, quick_reply=quick_reply))
+        try:
+            existing_user = supabase.table("users").select("*").eq("line_uid", user_id).execute()
+            user_data = existing_user.data[0] if existing_user.data else None
+
+            if user_data and user_data.get("group_id"):
+                group_id = user_data["group_id"]
+                role = user_data.get("group_role")
+                group_info = supabase.table("groups").select("*").eq("id", group_id).execute().data[0]
+                member_result = supabase.table("users").select("line_uid", count="exact").eq("group_id", group_id).execute()
+                member_count = member_result.count if member_result.count is not None else 0
+
+                try:
+                    owner_profile = line_bot_api.get_profile(group_info["owner_line_uid"])
+                    owner_name = owner_profile.display_name
+                except Exception:
+                    owner_name = "未知車友"
+
+                role_text = "👑 群主（您自己）" if role == "OWNER" else f"👥 成員（群主：{owner_name}）"
+
+                reply_text = (
+                    "👥 您目前的結拜包廂資訊\n\n"
+                    f"身分：{role_text}\n"
+                    f"🔑 包廂密碼：{group_info['group_password']}\n"
+                    f"👤 目前人數：{member_count}/{group_info['member_limit']}\n\n"
+                    "如需離開，請點下方按鈕退出。"
+                )
+                quick_reply = QuickReply(items=[
+                    QuickReplyButton(action=MessageAction(label="🚪 退出包廂", text="退出包廂"))
+                ])
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text, quick_reply=quick_reply))
+            else:
+                quick_reply = QuickReply(items=[
+                    QuickReplyButton(action=MessageAction(label="🏠 建立包廂", text="建立包廂")),
+                    QuickReplyButton(action=MessageAction(label="🔑 我要加入包廂", text="我要加入包廂"))
+                ])
+                reply_text = "👥 結拜包廂管理\n\n請選擇要建立新包廂，還是輸入密碼加入車友的包廂："
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text, quick_reply=quick_reply))
+        except Exception as e:
+            reply_text = f"❌ 查詢包廂狀態時發生異常: {str(e)}"
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
+        return
+
+    # 🚪 規則：退出包廂（含群主自動繼承機制＋全員通知）
+    if user_msg == "退出包廂":
+        try:
+            existing_user = supabase.table("users").select("*").eq("line_uid", user_id).execute()
+            user_data = existing_user.data[0] if existing_user.data else None
+
+            if not user_data or not user_data.get("group_id"):
+                reply_text = "⚠️ 您目前沒有加入任何包廂，無需退出。"
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
+                return
+
+            group_id = user_data["group_id"]
+            role = user_data.get("group_role")
+
+            try:
+                leaving_profile = line_bot_api.get_profile(user_id)
+                leaving_name = leaving_profile.display_name
+            except Exception:
+                leaving_name = "一位車友"
+
+            supabase.table("users").update({
+                "group_id": None, "group_role": None, "joined_group_at": None
+            }).eq("line_uid", user_id).execute()
+
+            if role == "OWNER":
+                remaining = supabase.table("users").select("*").eq("group_id", group_id).order("joined_group_at").execute().data
+                if remaining:
+                    new_owner = remaining[0]
+                    supabase.table("users").update({"group_role": "OWNER"}).eq("line_uid", new_owner["line_uid"]).execute()
+                    supabase.table("groups").update({"owner_line_uid": new_owner["line_uid"]}).eq("id", group_id).execute()
+
+                    try:
+                        new_owner_profile = line_bot_api.get_profile(new_owner["line_uid"])
+                        new_owner_name = new_owner_profile.display_name
+                    except Exception:
+                        new_owner_name = "新群主"
+
+                    # 通知新群主本人
+                    try:
+                        line_bot_api.push_message(
+                            new_owner["line_uid"],
+                            TextSendMessage(text=f"👑 原群主（{leaving_name}）已退出包廂，您已自動升任為新群主！")
+                        )
+                    except Exception:
+                        pass
+
+                    # 通知其他剩餘成員（排除新群主本人）
+                    for member in remaining[1:]:
+                        try:
+                            line_bot_api.push_message(
+                                member["line_uid"],
+                                TextSendMessage(text=f"📢 包廂公告：原群主（{leaving_name}）已退出，{new_owner_name} 已自動升任為新群主。")
+                            )
+                        except Exception:
+                            pass
+                else:
+                    supabase.table("groups").delete().eq("id", group_id).execute()
+
+            reply_text = "✅ 您已成功退出包廂。"
+        except Exception as e:
+            reply_text = f"❌ 退出包廂時發生異常: {str(e)}"
+
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
         return
 
     # 🏠 規則：建立包廂
