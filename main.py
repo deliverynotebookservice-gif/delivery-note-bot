@@ -149,9 +149,26 @@ def handle_message(event):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
         return
 
-    # 🔓 規則：加入包廂（輸入「加入 密碼」）
-    if user_msg.startswith("加入 "):
-        input_password = user_msg.replace("加入 ", "").strip().upper()
+    # 🔓 規則：加入包廂（支援「加入 密碼」或使用者忘記打「加入」、直接輸入 6 碼密碼）
+    is_join_with_prefix = user_msg.startswith("加入")
+    stripped_msg = user_msg.strip()
+    is_bare_password_guess = (
+        not is_join_with_prefix
+        and len(stripped_msg) == 6
+        and stripped_msg.isalnum()
+    )
+
+    if is_join_with_prefix or is_bare_password_guess:
+        if is_join_with_prefix:
+            input_password = user_msg[2:].strip().upper()
+        else:
+            input_password = stripped_msg.upper()
+
+        if len(input_password) != 6:
+            reply_text = "🔑 密碼格式不正確，請輸入「加入 密碼」，例如：\n加入 7XK2W9"
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
+            return
+
         try:
             existing_user = supabase.table("users").select("group_id").eq("line_uid", user_id).execute()
             if existing_user.data and existing_user.data[0].get("group_id"):
