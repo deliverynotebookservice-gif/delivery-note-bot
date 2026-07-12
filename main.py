@@ -253,7 +253,7 @@ def handle_message(event):
     stripped_msg = user_msg.strip()
     is_bare_password_guess = (
         not is_join_with_prefix
-        and len(stripped_msg) == 6
+        and 4 <= len(stripped_msg) <= 8
         and stripped_msg.isalnum()
     )
 
