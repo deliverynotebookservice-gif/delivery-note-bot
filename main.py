@@ -1,4 +1,5 @@
 import os
+import string
 import random
 import time
 import threading
@@ -7,7 +8,7 @@ from datetime import datetime
 from flask import Flask, request, abort
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
-from linebot.models import MessageEvent, TextMessage, TextSendMessage
+from linebot.models import MessageEvent, TextMessage, TextSendMessage, QuickReply, QuickReplyButton, MessageAction
 from supabase import create_client, Client
 
 app = Flask(__name__)
@@ -98,7 +99,96 @@ def handle_message(event):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
         return
 
-    if user_msg in ["查看結拜包廂", "查看衰退機制", "開啟更多設定"]:
+    # 👥 規則：結拜包廂管理入口——顯示快速回覆按鈕
+    if user_msg == "查看結拜包廂":
+        quick_reply = QuickReply(items=[
+            QuickReplyButton(action=MessageAction(label="🏠 建立包廂", text="建立包廂")),
+            QuickReplyButton(action=MessageAction(label="🔑 我要加入包廂", text="我要加入包廂"))
+        ])
+        reply_text = "👥 結拜包廂管理\n\n請選擇要建立新包廂，還是輸入密碼加入車友的包廂："
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text, quick_reply=quick_reply))
+        return
+
+    # 🏠 規則：建立包廂
+    if user_msg == "建立包廂":
+        try:
+            existing_user = supabase.table("users").select("group_id").eq("line_uid", user_id).execute()
+            if existing_user.data and existing_user.data[0].get("group_id"):
+                reply_text = "⚠️ 您目前已經是某個包廂的成員，請先退出目前的包廂才能建立新包廂。"
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
+                return
+
+            new_password = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            group_insert = supabase.table("groups").insert({
+                "group_password": new_password,
+                "owner_line_uid": user_id
+            }).execute()
+            new_group_id = group_insert.data[0]["id"]
+
+            supabase.table("users").upsert({
+                "line_uid": user_id,
+                "group_id": new_group_id,
+                "group_role": "OWNER",
+                "joined_group_at": datetime.now().isoformat()
+            }).execute()
+
+            reply_text = (
+                "🎉 包廂建立成功！您已成為群主。\n\n"
+                f"🔑 包廂密碼：{new_password}\n\n"
+                f"請將此密碼分享給結拜車友，讓他們輸入「加入 {new_password}」即可加入。"
+            )
+        except Exception as e:
+            reply_text = f"❌ 建立包廂時發生異常: {str(e)}"
+
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
+        return
+
+    # 🔑 規則：提示如何加入包廂
+    if user_msg == "我要加入包廂":
+        reply_text = "🔑 請直接輸入「加入 密碼」來加入車友的包廂，例如：\n加入 7XK2W9"
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
+        return
+
+    # 🔓 規則：加入包廂（輸入「加入 密碼」）
+    if user_msg.startswith("加入 "):
+        input_password = user_msg.replace("加入 ", "").strip().upper()
+        try:
+            existing_user = supabase.table("users").select("group_id").eq("line_uid", user_id).execute()
+            if existing_user.data and existing_user.data[0].get("group_id"):
+                reply_text = "⚠️ 您目前已經是某個包廂的成員，請先退出目前的包廂才能加入新包廂。"
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
+                return
+
+            group_query = supabase.table("groups").select("*").eq("group_password", input_password).execute()
+            if not group_query.data:
+                reply_text = "❌ 密碼錯誤，查無此包廂，請確認密碼是否正確。"
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
+                return
+
+            group_info = group_query.data[0]
+            member_count = supabase.table("users").select("line_uid", count="exact").eq("group_id", group_info["id"]).execute()
+            current_members = member_count.count if member_count.count is not None else 0
+
+            if current_members >= group_info["member_limit"]:
+                reply_text = f"⚠️ 此包廂人數已滿（{group_info['member_limit']}/{group_info['member_limit']}），無法加入。"
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
+                return
+
+            supabase.table("users").upsert({
+                "line_uid": user_id,
+                "group_id": group_info["id"],
+                "group_role": "MEMBER",
+                "joined_group_at": datetime.now().isoformat()
+            }).execute()
+
+            reply_text = "🎉 加入包廂成功！歡迎加入結拜車友的行列，一起互相避雷吧！"
+        except Exception as e:
+            reply_text = f"❌ 加入包廂時發生異常: {str(e)}"
+
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
+        return
+
+    if user_msg in ["查看衰退機制", "開啟更多設定"]:
         reply_text = (
             f"🛠️ 【{user_msg}】功能開發中，敬請期待！\n\n"
             "此功能已列入企劃，會在下一階段陸續上線，感謝您的耐心等候 🙏"
