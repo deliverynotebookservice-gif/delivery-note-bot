@@ -88,6 +88,24 @@ def handle_message(event):
         line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
         return
 
+    # 🚧 專屬按鈕文字比對（避免被其他關鍵字誤判，優先於規則二判斷）
+    if user_msg == "進入筆記回報":
+        reply_text = (
+            "🚨 開始回報配送環境筆記！\n\n"
+            "請直接輸入完整大樓地址（例如：台中市公益路二段100號），\n"
+            "系統會自動偵測並跳出客觀環境選項讓您勾選。"
+        )
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
+        return
+
+    if user_msg in ["查看結拜包廂", "查看衰退機制", "開啟更多設定"]:
+        reply_text = (
+            f"🛠️ 【{user_msg}】功能開發中，敬請期待！\n\n"
+            "此功能已列入企劃，會在下一階段陸續上線，感謝您的耐心等候 🙏"
+        )
+        line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
+        return
+    
     # 🔮 規則二：按鈕功能中樞——運勢抽籤（只要字串包含「運勢」就強制通關）
     if "運勢" in user_msg:
         if USER_RATE_LIMITS[user_id]["fortune_count"] >= 5:
